@@ -12,6 +12,7 @@ mod points;
 mod styled;
 
 pub use points::Points;
+pub(in crate::primitives) use points::Scanlines;
 pub use styled::StyledPixelsIterator;
 
 /// Circle primitive

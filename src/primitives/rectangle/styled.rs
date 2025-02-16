@@ -1,16 +1,19 @@
 use crate::{
     draw_target::DrawTarget,
-    geometry::{Dimensions, Point, Size},
+    geometry::{Dimensions, Point, Real, Size},
     pixelcolor::PixelColor,
     primitives::{
+        circle::Scanlines,
+        primitive_style::StrokeStyle,
         rectangle::{Points, Rectangle},
         styled::{StyledDimensions, StyledDrawable, StyledPixels},
-        PointsIter, PrimitiveStyle,
+        Circle, PointsIter, PrimitiveStyle,
     },
     transform::Transform,
     Pixel,
 };
 use az::SaturatingAs;
+use core::cmp::max;
 
 /// Pixel iterator for each pixel in the rect border
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -69,6 +72,82 @@ impl<C: PixelColor> StyledPixels<PrimitiveStyle<C>> for Rectangle {
     }
 }
 
+fn draw_dotted_rectangle_border_with_dotted_corners<C, D>(
+    border: &Rectangle,
+    border_sides: &[Point],
+    dot_size: u32,
+    stroke_color: &C,
+    target: &mut D,
+) -> Result<<Rectangle as StyledDrawable<PrimitiveStyle<C>>>::Output, D::Error>
+where
+    C: PixelColor,
+    D: DrawTarget<Color = C>,
+{
+    let fill_only_style = PrimitiveStyle::with_fill(*stroke_color);
+
+    let mut corner_dot = Circle::new(border.top_left, dot_size);
+
+    for (idx, side) in border_sides.iter().enumerate() {
+        let length = border.size[idx % 2];
+        let nb_dots = length / (2 * dot_size);
+        let offset = Real::from(length) / Real::from(nb_dots);
+        let side_direction = *side / length as i32;
+
+        for dot_idx in 0..max(1, nb_dots) {
+            let translation =
+                side_direction * Into::<i32>::into((offset * Real::from(dot_idx)).round());
+            let dot = corner_dot.translate(translation);
+            for scanline in Scanlines::new(&fill_only_style.fill_area(&dot)) {
+                scanline.draw(target, *stroke_color)?;
+            }
+        }
+
+        corner_dot.translate_mut(*side);
+    }
+
+    Ok(())
+}
+
+fn draw_dotted_rectangle_border<C, D>(
+    border: &Rectangle,
+    border_sides: &[Point],
+    dot_size: u32,
+    stroke_color: &C,
+    target: &mut D,
+) -> Result<<Rectangle as StyledDrawable<PrimitiveStyle<C>>>::Output, D::Error>
+where
+    C: PixelColor,
+    D: DrawTarget<Color = C>,
+{
+    let fill_only_style = PrimitiveStyle::with_fill(*stroke_color);
+
+    let mut corner_dot = Circle::new(border.top_left, dot_size);
+    let mut unit_is_dot = true;
+
+    for (idx, side) in border_sides.iter().enumerate() {
+        let length = border.size[idx % 2];
+        let nb_units = length / dot_size;
+        let offset = Real::from(length) / Real::from(nb_units);
+        let side_direction = *side / length as i32;
+
+        for unit_idx in 0..nb_units {
+            if unit_is_dot {
+                let translation =
+                    side_direction * Into::<i32>::into((offset * Real::from(unit_idx)).round());
+                let dot = corner_dot.translate(translation);
+                for scanline in Scanlines::new(&fill_only_style.fill_area(&dot)) {
+                    scanline.draw(target, *stroke_color)?;
+                }
+            };
+            unit_is_dot = !unit_is_dot;
+        }
+
+        corner_dot.translate_mut(*side);
+    }
+
+    Ok(())
+}
+
 impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
     type Color = C;
     type Output = ();
@@ -89,11 +168,48 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
         }
 
         // Draw stroke
-        if let Some(stroke_color) = style.effective_stroke_color() {
-            let stroke_width = style.stroke_width;
+        let Some(stroke_color) = style.effective_stroke_color() else {
+            return Ok(());
+        };
+        let stroke_width = style.stroke_width;
 
-            let stroke_area = style.stroke_area(self);
+        let stroke_area = style.stroke_area(self);
 
+        if style.stroke_style == Some(StrokeStyle::Dotted) {
+            let dot_size = stroke_width
+                .min(stroke_area.size.height / 2)
+                .min(stroke_area.size.width / 2);
+            if dot_size == 0 {
+                return Ok(());
+            }
+
+            let border_size = stroke_area.size - Size::new(dot_size, dot_size);
+            let border = Rectangle::new(stroke_area.top_left, border_size);
+
+            let mut border_sides: [Point; 4] = [Point::zero(); 4];
+            border_sides[0] += border_size.x_axis();
+            border_sides[1] += border_size.y_axis();
+            border_sides[2] -= border_size.x_axis();
+            border_sides[3] -= border_size.y_axis();
+
+            if dot_size < 3 {
+                draw_dotted_rectangle_border(
+                    &border,
+                    &border_sides,
+                    dot_size,
+                    &stroke_color,
+                    target,
+                )?;
+            } else {
+                draw_dotted_rectangle_border_with_dotted_corners(
+                    &border,
+                    &border_sides,
+                    dot_size,
+                    &stroke_color,
+                    target,
+                )?;
+            }
+        } else {
             let top_border = Rectangle::new(
                 stroke_area.top_left,
                 Size::new(
