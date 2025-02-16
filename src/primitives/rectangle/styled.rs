@@ -3,9 +3,10 @@ use crate::{
     geometry::{Dimensions, Point, Size},
     pixelcolor::PixelColor,
     primitives::{
+        circle::Scanlines,
         rectangle::{Points, Rectangle},
         styled::{StyledDimensions, StyledDrawable, StyledPixels},
-        PointsIter, PrimitiveStyle,
+        Circle, PointsIter, PrimitiveStyle,
     },
     transform::Transform,
     Pixel,
@@ -94,7 +95,38 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
 
             let stroke_area = style.stroke_area(self);
 
-            let top_border = Rectangle::new(
+            /* ATTEMPT AT DOTS IN THE CORNERS */
+            let fill_only_style = PrimitiveStyle::with_fill(stroke_color);
+
+            let diameter = stroke_width
+                .min(stroke_area.size.height / 2)
+                .min(stroke_area.size.width / 2);
+            if diameter != 0 {
+                let border_size = stroke_area.size - Size::new(diameter, diameter);
+
+                let top_left_corner = Circle::new(stroke_area.top_left, diameter);
+                let top_right_corner =
+                    Circle::new(stroke_area.top_left + border_size.x_axis(), diameter);
+                let bottom_left_corner =
+                    Circle::new(stroke_area.top_left + border_size.y_axis(), diameter);
+                let bottom_right_corner = Circle::new(stroke_area.top_left + border_size, diameter);
+
+                let corner_dots = [
+                    top_left_corner,
+                    top_right_corner,
+                    bottom_left_corner,
+                    bottom_right_corner,
+                ];
+
+                for dot in &corner_dots {
+                    for scanline in Scanlines::new(&fill_only_style.fill_area(dot)) {
+                        scanline.draw(target, stroke_color)?;
+                    }
+                }
+            }
+            /* ATTEMPT AT DOTS IN THE CORNERS */
+
+            /* let top_border = Rectangle::new(
                 stroke_area.top_left,
                 Size::new(
                     stroke_area.size.width,
@@ -136,7 +168,7 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
 
                 target.fill_solid(&left_border, stroke_color)?;
                 target.fill_solid(&right_border, stroke_color)?;
-            }
+            } */
         }
 
         Ok(())
