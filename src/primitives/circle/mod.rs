@@ -8,7 +8,7 @@ use crate::{
     transform::Transform,
 };
 
-mod points;
+pub(in crate::primitives) mod points;
 mod styled;
 
 pub use points::Points;

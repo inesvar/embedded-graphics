@@ -3,9 +3,10 @@ use crate::{
     geometry::{Dimensions, Point, Size},
     pixelcolor::PixelColor,
     primitives::{
+        circle::points::Scanlines,
         rectangle::{Points, Rectangle},
         styled::{StyledDimensions, StyledDrawable, StyledPixels},
-        PointsIter, PrimitiveStyle,
+        Circle, PointsIter, PrimitiveStyle,
     },
     transform::Transform,
     Pixel,
@@ -92,7 +93,33 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
         if let Some(stroke_color) = style.effective_stroke_color() {
             let stroke_width = style.stroke_width;
 
-            let stroke_area = style.stroke_area(self);
+            /* ATTEMPT AT DOTS IN THE CORNERS */
+            let top_left_corner = Circle::new(self.top_left, 2 * stroke_width);
+            let top_right_corner =
+                Circle::new(self.top_left + self.size.x_axis(), 2 * stroke_width);
+
+            for scanline in Scanlines::new(&style.fill_area(&top_left_corner)) {
+                scanline.draw(target, stroke_color)?;
+            }
+
+            for scanline in Scanlines::new(&style.fill_area(&top_right_corner)) {
+                scanline.draw(target, stroke_color)?;
+            }
+
+            let bottom_left_corner =
+                Circle::new(self.top_left + self.size.y_axis(), 2 * stroke_width);
+            let bottom_right_corner = Circle::new(self.top_left + self.size, 2 * stroke_width);
+
+            for scanline in Scanlines::new(&style.fill_area(&bottom_left_corner)) {
+                scanline.draw(target, stroke_color)?;
+            }
+
+            for scanline in Scanlines::new(&style.fill_area(&bottom_right_corner)) {
+                scanline.draw(target, stroke_color)?;
+            }
+            /* ATTEMPT AT DOTS IN THE CORNERS */
+
+            /* let stroke_area = style.stroke_area(self);
 
             let top_border = Rectangle::new(
                 stroke_area.top_left,
@@ -136,7 +163,7 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
 
                 target.fill_solid(&left_border, stroke_color)?;
                 target.fill_solid(&right_border, stroke_color)?;
-            }
+            } */
         }
 
         Ok(())
