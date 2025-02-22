@@ -42,6 +42,13 @@ where
     /// This property only applies to closed shapes (rectangle, circle, ...) and is
     /// ignored for open shapes (line, ...).
     pub stroke_alignment: StrokeAlignment,
+
+    /// Stroke style.
+    ///
+    /// The `stroke_style` sets a particular style, for instance the dotted style.
+    /// This feature is only implemented for the [`Rectangle`](crate::primitives::Rectangle)
+    /// primitive, and `stroke_style` will be ignored for all other primitives.
+    pub stroke_style: Option<StrokeStyle>,
 }
 
 impl<C> PrimitiveStyle<C>
@@ -131,6 +138,7 @@ where
             stroke_color: None,
             stroke_width: 0,
             stroke_alignment: StrokeAlignment::Center,
+            stroke_style: None,
         }
     }
 }
@@ -254,6 +262,16 @@ where
         self
     }
 
+    /// Sets the stroke style.
+    ///
+    /// This feature is not supported for all primitives, see [PrimitiveStyle::stroke_style]
+    /// for the complete list.
+    pub const fn stroke_style(mut self, stroke_style: Option<StrokeStyle>) -> Self {
+        self.style.stroke_style = stroke_style;
+
+        self
+    }
+
     /// Builds the primitive style.
     pub const fn build(self) -> PrimitiveStyle<C> {
         self.style
@@ -287,6 +305,15 @@ impl Default for StrokeAlignment {
     }
 }
 
+/// Stroke style.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[cfg_attr(feature = "defmt", derive(::defmt::Format))]
+#[non_exhaustive]
+pub enum StrokeStyle {
+    /// Dotted.
+    Dotted,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -301,6 +328,7 @@ mod tests {
                 stroke_color: None,
                 stroke_width: 0,
                 stroke_alignment: StrokeAlignment::Center,
+                stroke_style: None,
             }
         );
 
