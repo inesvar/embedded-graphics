@@ -4,6 +4,7 @@ use crate::{
     pixelcolor::PixelColor,
     primitives::{
         circle::Scanlines,
+        primitive_style::StrokeStyle,
         rectangle::{Points, Rectangle},
         styled::{StyledDimensions, StyledDrawable, StyledPixels},
         Circle, PointsIter, PrimitiveStyle,
@@ -90,75 +91,77 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
         }
 
         // Draw stroke
-        if let Some(stroke_color) = style.effective_stroke_color() {
-            let stroke_width = style.stroke_width;
+        let Some(stroke_color) = style.effective_stroke_color() else {
+            return Ok(());
+        };
+        let stroke_width = style.stroke_width;
 
-            let stroke_area = style.stroke_area(self);
+        let stroke_area = style.stroke_area(self);
 
-            /* ATTEMPT AT DOTS IN THE CORNERS */
+        if style.stroke_style == Some(StrokeStyle::Dotted) {
             let fill_only_style = PrimitiveStyle::with_fill(stroke_color);
 
             let diameter = stroke_width
                 .min(stroke_area.size.height / 2)
                 .min(stroke_area.size.width / 2);
-            if diameter != 0 {
-                let border_size = stroke_area.size - Size::new(diameter, diameter);
+            if diameter == 0 {
+                return Ok(());
+            }
+            let border_size = stroke_area.size - Size::new(diameter, diameter);
 
-                let top_left_corner = Circle::new(stroke_area.top_left, diameter);
-                let top_right_corner =
-                    Circle::new(stroke_area.top_left + border_size.x_axis(), diameter);
-                let bottom_left_corner =
-                    Circle::new(stroke_area.top_left + border_size.y_axis(), diameter);
-                let bottom_right_corner = Circle::new(stroke_area.top_left + border_size, diameter);
+            let top_left_corner = Circle::new(stroke_area.top_left, diameter);
+            let top_right_corner =
+                Circle::new(stroke_area.top_left + border_size.x_axis(), diameter);
+            let bottom_left_corner =
+                Circle::new(stroke_area.top_left + border_size.y_axis(), diameter);
+            let bottom_right_corner = Circle::new(stroke_area.top_left + border_size, diameter);
 
-                let corner_dots = [
-                    top_left_corner,
-                    top_right_corner,
-                    bottom_left_corner,
-                    bottom_right_corner,
-                ];
+            let corner_dots = [
+                top_left_corner,
+                top_right_corner,
+                bottom_left_corner,
+                bottom_right_corner,
+            ];
 
-                for dot in &corner_dots {
-                    for scanline in Scanlines::new(&fill_only_style.fill_area(dot)) {
+            for dot in &corner_dots {
+                for scanline in Scanlines::new(&fill_only_style.fill_area(dot)) {
+                    scanline.draw(target, stroke_color)?;
+                }
+            }
+
+            if border_size.width > 2 * diameter {
+                let nb_dots_x = (border_size.width - 2 * diameter) / (2 * diameter);
+                let offset_x = Real::from(border_size.width) / Real::from(nb_dots_x + 1);
+                for i in 1..=nb_dots_x {
+                    let translation = Point::new((offset_x * Real::from(i)).round().into(), 0);
+                    let top_dot = top_left_corner.translate(translation);
+                    let bottom_dot = bottom_left_corner.translate(translation);
+                    for scanline in Scanlines::new(&fill_only_style.fill_area(&top_dot)) {
+                        scanline.draw(target, stroke_color)?;
+                    }
+                    for scanline in Scanlines::new(&fill_only_style.fill_area(&bottom_dot)) {
                         scanline.draw(target, stroke_color)?;
                     }
                 }
+            }
 
-                if border_size.width > 2 * diameter {
-                    let nb_dots_x = (border_size.width - 2 * diameter) / (2 * diameter);
-                    let offset_x = Real::from(border_size.width) / Real::from(nb_dots_x + 1);
-                    for i in 1..=nb_dots_x {
-                        let translation = Point::new((offset_x * Real::from(i)).round().into(), 0);
-                        let top_dot = top_left_corner.translate(translation);
-                        let bottom_dot = bottom_left_corner.translate(translation);
-                        for scanline in Scanlines::new(&fill_only_style.fill_area(&top_dot)) {
-                            scanline.draw(target, stroke_color)?;
-                        }
-                        for scanline in Scanlines::new(&fill_only_style.fill_area(&bottom_dot)) {
-                            scanline.draw(target, stroke_color)?;
-                        }
+            if border_size.height > 2 * diameter {
+                let nb_dots_y = (border_size.height - 2 * diameter) / (2 * diameter);
+                let offset_y = Real::from(border_size.height) / Real::from(nb_dots_y + 1);
+                for i in 1..=nb_dots_y {
+                    let translation = Point::new(0, (offset_y * Real::from(i)).round().into());
+                    let left_dot = top_left_corner.translate(translation);
+                    let right_dot = top_right_corner.translate(translation);
+                    for scanline in Scanlines::new(&fill_only_style.fill_area(&left_dot)) {
+                        scanline.draw(target, stroke_color)?;
                     }
-                }
-
-                if border_size.height > 2 * diameter {
-                    let nb_dots_y = (border_size.height - 2 * diameter) / (2 * diameter);
-                    let offset_y = Real::from(border_size.height) / Real::from(nb_dots_y + 1);
-                    for i in 1..=nb_dots_y {
-                        let translation = Point::new(0, (offset_y * Real::from(i)).round().into());
-                        let left_dot = top_left_corner.translate(translation);
-                        let right_dot = top_right_corner.translate(translation);
-                        for scanline in Scanlines::new(&fill_only_style.fill_area(&left_dot)) {
-                            scanline.draw(target, stroke_color)?;
-                        }
-                        for scanline in Scanlines::new(&fill_only_style.fill_area(&right_dot)) {
-                            scanline.draw(target, stroke_color)?;
-                        }
+                    for scanline in Scanlines::new(&fill_only_style.fill_area(&right_dot)) {
+                        scanline.draw(target, stroke_color)?;
                     }
                 }
             }
-            /* ATTEMPT AT DOTS IN THE CORNERS */
-
-            /* let top_border = Rectangle::new(
+        } else {
+            let top_border = Rectangle::new(
                 stroke_area.top_left,
                 Size::new(
                     stroke_area.size.width,
@@ -200,7 +203,7 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
 
                 target.fill_solid(&left_border, stroke_color)?;
                 target.fill_solid(&right_border, stroke_color)?;
-            } */
+            }
         }
 
         Ok(())
