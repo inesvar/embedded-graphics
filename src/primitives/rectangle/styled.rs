@@ -1,6 +1,6 @@
 use crate::{
     draw_target::DrawTarget,
-    geometry::{Dimensions, Point, Size},
+    geometry::{Dimensions, Point, Real, Size},
     pixelcolor::PixelColor,
     primitives::{
         circle::Scanlines,
@@ -121,6 +121,38 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
                 for dot in &corner_dots {
                     for scanline in Scanlines::new(&fill_only_style.fill_area(dot)) {
                         scanline.draw(target, stroke_color)?;
+                    }
+                }
+
+                if border_size.width > 2 * diameter {
+                    let nb_dots_x = (border_size.width - 2 * diameter) / (2 * diameter);
+                    let offset_x = Real::from(border_size.width) / Real::from(nb_dots_x + 1);
+                    for i in 1..=nb_dots_x {
+                        let translation = Point::new((offset_x * Real::from(i)).round().into(), 0);
+                        let top_dot = top_left_corner.translate(translation);
+                        let bottom_dot = bottom_left_corner.translate(translation);
+                        for scanline in Scanlines::new(&fill_only_style.fill_area(&top_dot)) {
+                            scanline.draw(target, stroke_color)?;
+                        }
+                        for scanline in Scanlines::new(&fill_only_style.fill_area(&bottom_dot)) {
+                            scanline.draw(target, stroke_color)?;
+                        }
+                    }
+                }
+
+                if border_size.height > 2 * diameter {
+                    let nb_dots_y = (border_size.height - 2 * diameter) / (2 * diameter);
+                    let offset_y = Real::from(border_size.height) / Real::from(nb_dots_y + 1);
+                    for i in 1..=nb_dots_y {
+                        let translation = Point::new(0, (offset_y * Real::from(i)).round().into());
+                        let left_dot = top_left_corner.translate(translation);
+                        let right_dot = top_right_corner.translate(translation);
+                        for scanline in Scanlines::new(&fill_only_style.fill_area(&left_dot)) {
+                            scanline.draw(target, stroke_color)?;
+                        }
+                        for scanline in Scanlines::new(&fill_only_style.fill_area(&right_dot)) {
+                            scanline.draw(target, stroke_color)?;
+                        }
                     }
                 }
             }
