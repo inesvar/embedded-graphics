@@ -130,30 +130,45 @@ fn start_dot_offset(line: &Line, dot_size: i32) -> Point {
 }
 
 fn is_nearly_horizontal_or_vertical(line: &Line) -> bool {
-    let mut points = Points::new(line);
-
-    let Some(second) = points.nth(1) else {
-        // The orientation of the degenerated line is horizontal.
+    let abs_delta = line.delta().abs();
+    if abs_delta == Point::zero() {
         return true;
+    }
+    let (min, max) = if abs_delta.x >= abs_delta.y {
+        (abs_delta.y, abs_delta.x)
+    } else {
+        (abs_delta.x, abs_delta.y)
     };
 
-    let diff = second - line.start;
-    let sum = diff.abs().dot_product(Point::new(1, 1));
-
-    // If the first two pixels share an edge, the line is nearly horizontal or vertical.
-    sum == 1
+    2 * min < max
 }
 
 fn extend_line_by_one_unit(line: &Line) -> Line {
-    let mut points = Points::new(line);
-
-    let Some(second) = points.nth(1) else {
-        // If there is only one point in the iterator, the line is expected to be reduced to a point.
-        // In that case we don't extend the line.
+    let delta = line.delta();
+    let direction = Point::new(delta.x.signum(), delta.y.signum());
+    let abs_delta = delta.abs();
+    if abs_delta == Point::zero() {
         return *line;
+    }
+
+    // Determine major and minor directions.
+    let ((min, max), (minor_step, major_step)) = if abs_delta.x >= abs_delta.y {
+        (
+            (abs_delta.y, abs_delta.x),
+            (direction.y_axis(), direction.x_axis()),
+        )
+    } else {
+        (
+            (abs_delta.x, abs_delta.y),
+            (direction.x_axis(), direction.y_axis()),
+        )
     };
 
-    Line::new(line.start, line.end + second - line.start)
+    if 2 * min < max {
+        Line::new(line.start, line.end + major_step)
+    } else {
+        Line::new(line.start, line.end + major_step + minor_step)
+    }
 }
 
 impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Line {
