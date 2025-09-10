@@ -12,6 +12,7 @@ mod bresenham_circle;
 mod points;
 mod styled;
 
+use bresenham_circle::StyledBresenhamCircleIterator;
 pub use points::Points;
 pub use styled::StyledPixelsIterator;
 
