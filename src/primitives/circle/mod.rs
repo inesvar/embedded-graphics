@@ -8,6 +8,7 @@ use crate::{
     transform::Transform,
 };
 
+mod bresenham_circle;
 mod points;
 mod styled;
 
