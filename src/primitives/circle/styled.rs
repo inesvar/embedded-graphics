@@ -3,11 +3,11 @@ use crate::{
     geometry::{Dimensions, Point, PointExt},
     pixelcolor::PixelColor,
     primitives::{
-        circle::{points::Scanlines, Circle},
+        circle::{points::Scanlines, Circle, StyledBresenhamCircleIterator},
         common::{Scanline, StyledScanline},
         rectangle::Rectangle,
         styled::{StyledDimensions, StyledDrawable, StyledPixels},
-        PrimitiveStyle,
+        PrimitiveStyle, StrokeStyle,
     },
     Pixel,
 };
@@ -114,7 +114,16 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Circle {
     where
         D: DrawTarget<Color = C>,
     {
-        match (style.effective_stroke_color(), style.fill_color) {
+        let dot_size = style.stroke_width as i32;
+
+        let stroke_without_scanline = style.stroke_style == StrokeStyle::Dotted && dot_size == 1;
+
+        match (
+            style
+                .effective_stroke_color()
+                .filter(|_| !stroke_without_scanline),
+            style.fill_color,
+        ) {
             (Some(stroke_color), None) => {
                 for scanline in
                     StyledScanlines::new(&style.stroke_area(self), &style.fill_area(self))
@@ -135,6 +144,10 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Circle {
                 }
             }
             (None, None) => {}
+        }
+
+        if stroke_without_scanline & style.effective_stroke_color().is_some() {
+            target.draw_iter(StyledBresenhamCircleIterator::new(self, style).step_by(2))?;
         }
 
         Ok(())
