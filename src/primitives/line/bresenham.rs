@@ -3,43 +3,43 @@ use crate::{geometry::Point, primitives::Line};
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[cfg_attr(feature = "defmt", derive(::defmt::Format))]
 /// Struct to hold major and minor values.
-pub struct MajorMinor<T> {
+pub(in crate::primitives) struct MajorMinor<T> {
     /// Major value.
     ///
     /// Used to describe the change of a value when a major step is taken.
-    pub major: T,
+    pub(in crate::primitives) major: T,
 
     /// Minor value.
     ///
     /// Used to describe the change of a value when a minor step is taken.
-    pub minor: T,
+    pub(in crate::primitives) minor: T,
 }
 
 impl<T> MajorMinor<T> {
     /// Creates a new struct holding a major and a minor value.
-    pub const fn new(major: T, minor: T) -> Self {
+    pub(in crate::primitives) const fn new(major: T, minor: T) -> Self {
         Self { major, minor }
     }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[cfg_attr(feature = "defmt", derive(::defmt::Format))]
-pub struct BresenhamParameters {
+pub(super) struct BresenhamParameters {
     /// Error threshold.
     ///
     /// If the accumulated error exceeds the threshold a minor move is made.
-    pub error_threshold: i32,
+    error_threshold: i32,
 
     /// Change in error for major and minor steps.
-    pub error_step: MajorMinor<i32>,
+    pub(super) error_step: MajorMinor<i32>,
 
     /// Change in position for major and minor steps.
-    pub position_step: MajorMinor<Point>,
+    pub(super) position_step: MajorMinor<Point>,
 }
 
 impl BresenhamParameters {
     /// Creates a new bresenham parameters object.
-    pub fn new(line: &Line) -> Self {
+    pub(super) fn new(line: &Line) -> Self {
         let delta = line.end - line.start;
 
         let direction = Point::new(
@@ -73,7 +73,7 @@ impl BresenhamParameters {
     ///
     /// If the error threshold is reached the error is reduced by a minor step and
     /// `true` is returned.
-    pub fn increase_error(&self, error: &mut i32) -> bool {
+    pub(super) fn increase_error(&self, error: &mut i32) -> bool {
         *error += self.error_step.major;
         if *error > self.error_threshold {
             *error -= self.error_step.minor;
@@ -88,7 +88,7 @@ impl BresenhamParameters {
     ///
     /// If the error threshold is reached the error is increased by a minor step and
     /// `true` is returned.
-    pub fn decrease_error(&self, error: &mut i32) -> bool {
+    pub(super) fn decrease_error(&self, error: &mut i32) -> bool {
         *error -= self.error_step.major;
         if *error <= -self.error_threshold {
             *error += self.error_step.minor;
@@ -114,9 +114,9 @@ impl BresenhamParameters {
 /// Implementation of the bresenham algorithm.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[cfg_attr(feature = "defmt", derive(::defmt::Format))]
-pub struct Bresenham {
+pub(super) struct Bresenham {
     /// Current point.
-    pub point: Point,
+    pub(super) point: Point,
 
     /// Error accumulator.
     error: i32,
@@ -124,12 +124,12 @@ pub struct Bresenham {
 
 impl Bresenham {
     /// Creates a new bresenham object.
-    pub const fn new(start_point: Point) -> Self {
+    pub(super) const fn new(start_point: Point) -> Self {
         Self::with_initial_error(start_point, 0)
     }
 
     /// Creates a new bresenham object with the initial error.
-    pub const fn with_initial_error(start_point: Point, initial_error: i32) -> Self {
+    pub(super) const fn with_initial_error(start_point: Point, initial_error: i32) -> Self {
         Self {
             point: start_point,
             error: initial_error,
@@ -137,7 +137,7 @@ impl Bresenham {
     }
 
     /// Returns the next point on the line.
-    pub fn next(&mut self, parameters: &BresenhamParameters) -> Point {
+    pub(super) fn next(&mut self, parameters: &BresenhamParameters) -> Point {
         if self.error > parameters.error_threshold {
             self.point += parameters.position_step.minor;
             self.error -= parameters.error_step.minor;
@@ -152,7 +152,7 @@ impl Bresenham {
     }
 
     /// Returns the next point on the line, including extra points.
-    pub fn next_all(&mut self, parameters: &BresenhamParameters) -> BresenhamPoint {
+    pub(super) fn next_all(&mut self, parameters: &BresenhamParameters) -> BresenhamPoint {
         let mut point = self.point;
 
         if self.error > parameters.error_threshold {
@@ -174,7 +174,7 @@ impl Bresenham {
     }
 
     /// Returns the previous point on the line, including extra points.
-    pub fn previous_all(&mut self, parameters: &BresenhamParameters) -> BresenhamPoint {
+    pub(super) fn previous_all(&mut self, parameters: &BresenhamParameters) -> BresenhamPoint {
         let mut point = self.point;
 
         if self.error <= -parameters.error_threshold {
@@ -199,7 +199,7 @@ impl Bresenham {
 /// Point returned by `next_all` and `previous_all` to distinguish the point type.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[cfg_attr(feature = "defmt", derive(::defmt::Format))]
-pub enum BresenhamPoint {
+pub(super) enum BresenhamPoint {
     /// Normal point.
     Normal(Point),
 
@@ -212,7 +212,7 @@ pub enum BresenhamPoint {
 }
 
 /// Returns the length of a line in bresenham major direction steps.
-pub fn major_length(line: &Line) -> u32 {
+pub(super) fn major_length(line: &Line) -> u32 {
     let delta = (line.end - line.start).abs();
 
     delta.x.max(delta.y) as u32 + 1
