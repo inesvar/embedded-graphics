@@ -1,6 +1,8 @@
+#[cfg(test)]
+use crate::geometry::Real;
 use crate::{
     draw_target::DrawTarget,
-    geometry::{Dimensions, Point, Real, Size},
+    geometry::{Dimensions, Point, Size},
     pixelcolor::PixelColor,
     primitives::{
         primitive_style::StrokeStyle,
@@ -70,6 +72,7 @@ impl<C: PixelColor> StyledPixels<PrimitiveStyle<C>> for Rectangle {
     }
 }
 
+#[cfg(test)]
 /// Compute dot positions from a `length` and `dot_size`.
 ///
 /// A dot will be positioned at each endpoint (except in cases described below).
@@ -102,6 +105,7 @@ fn dot_positions_with_dotted_corners(
     idx_iter.map(move |idx| (dot_offset * Real::from(idx)).round().into())
 }
 
+#[cfg(test)]
 /// Compute dot and gap positions from a `length` and `dot_size`.
 ///
 /// A dot or a gap can be positioned at each endpoint. The starting endpoint
@@ -122,6 +126,7 @@ fn unit_positions_in_clockwise_order(length: u32, dot_size: u32) -> impl Iterato
     idx_iter.map(move |idx| (unit_offset * Real::from(idx)).round().into())
 }
 
+#[cfg(test)]
 /// Draw a dotted rectangular border with dots in the 4 corners.
 ///
 /// The gaps between dots ideally have the same size as the dots.
@@ -289,6 +294,8 @@ where
 
     Ok(())
 }
+
+#[cfg(test)]
 /// Draw a dotted rectangular border.
 ///
 /// The dot type is [`Rectangle`] (this method is meant to be used with smaller values of `dot_size`).
