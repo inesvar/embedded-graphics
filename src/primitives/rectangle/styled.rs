@@ -347,6 +347,12 @@ where
     }
 }
 
+fn is_valid_dot_size(dot_size: u32, border_size: Size) -> bool {
+    let dot_size_leq_border_size = border_size.height >= dot_size && border_size.width >= dot_size;
+
+    dot_size_leq_border_size || dot_size == 1
+}
+
 impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
     type Color = C;
     type Output = ();
@@ -383,6 +389,8 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
                 .max(1);
             let border_size = stroke_area.size.saturating_sub(Size::new_equal(dot_size));
             let dot_style = PrimitiveStyle::with_fill(stroke_color);
+
+            debug_assert!(is_valid_dot_size(dot_size, border_size));
 
             if dot_size < 4 {
                 draw_dotted_rectangle_border_in_clockwise_order2(
@@ -1004,5 +1012,81 @@ mod tests {
 
         let mut positions = unit_positions_in_clockwise_order(7, 10);
         assert_eq!(positions.next(), None);
+    }
+
+    #[test]
+    fn draw_dotted_rectangle_border_with_dotted_corners_are_equivalent(
+    ) -> Result<(), <MockDisplay<BinaryColor> as DrawTarget>::Error> {
+        let dot_style = PrimitiveStyle::with_fill(BinaryColor::On);
+        for dot_size in 4..9 {
+            for width in 0..50 {
+                for height in 0..50 {
+                    if !is_valid_dot_size(dot_size, Size::new(width, height)) {
+                        continue;
+                    }
+
+                    let new: &mut MockDisplay<BinaryColor> = &mut MockDisplay::new();
+
+                    draw_dotted_rectangle_border_with_dotted_corners2(
+                        &Point::zero(),
+                        &Size::new(width, height),
+                        dot_size,
+                        &dot_style,
+                        new,
+                    )?;
+
+                    let old: &mut MockDisplay<BinaryColor> = &mut MockDisplay::new();
+
+                    draw_dotted_rectangle_border_with_dotted_corners(
+                        &Point::zero(),
+                        &Size::new(width, height),
+                        dot_size,
+                        &dot_style,
+                        old,
+                    )?;
+
+                    assert_eq!(old, new);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn draw_dotted_rectangle_border_in_clockwise_order_are_equivalent(
+    ) -> Result<(), <MockDisplay<BinaryColor> as DrawTarget>::Error> {
+        let dot_style = PrimitiveStyle::with_fill(BinaryColor::On);
+        for dot_size in 0..4 {
+            for width in 0..50 {
+                for height in 0..50 {
+                    if !is_valid_dot_size(dot_size, Size::new(width, height)) {
+                        continue;
+                    }
+
+                    let new: &mut MockDisplay<BinaryColor> = &mut MockDisplay::new();
+
+                    draw_dotted_rectangle_border_in_clockwise_order2(
+                        &Point::zero(),
+                        &Size::new(width, height),
+                        dot_size,
+                        &dot_style,
+                        new,
+                    )?;
+
+                    let old: &mut MockDisplay<BinaryColor> = &mut MockDisplay::new();
+
+                    draw_dotted_rectangle_border_in_clockwise_order(
+                        &Point::zero(),
+                        &Size::new(width, height),
+                        dot_size,
+                        &dot_style,
+                        old,
+                    )?;
+
+                    assert_eq!(old, new);
+                }
+            }
+        }
+        Ok(())
     }
 }
