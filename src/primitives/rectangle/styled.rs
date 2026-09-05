@@ -6,7 +6,7 @@ use crate::{
         primitive_style::StrokeStyle,
         rectangle::{Points, Rectangle},
         styled::{StyledDimensions, StyledDrawable, StyledPixels},
-        Circle, PointsIter, PrimitiveStyle,
+        Circle, DottedLinePoints, Line, PointsIter, PrimitiveStyle,
     },
     transform::Transform,
     Pixel,
@@ -166,6 +166,129 @@ where
     Ok(())
 }
 
+/// Draw a non-degenerate rectangle border using 4 dotted lines.
+/// Each corner is a dot and the result has central symmetry.
+fn draw_dotted_rectangle_border_with_dotted_corners2<D>(
+    top_left: &Point,
+    border_size: &Size,
+    dot_size: u32,
+    style: &PrimitiveStyle<D::Color>,
+    target: &mut D,
+) -> Result<(), D::Error>
+where
+    D: DrawTarget,
+{
+    let top_left_dot = Circle::new(*top_left, dot_size);
+
+    // Draw horizontal sides (including top right and bottom left corner dots)
+    let horizontal_line = Line::new(Point::zero(), Point::new(border_size.width as i32, 0));
+    let dotted_line = DottedLinePoints::with_dot_size(&horizontal_line, dot_size as i32);
+
+    for position in dotted_line.skip(1) {
+        top_left_dot
+            .translate(position)
+            .draw_styled(style, target)?;
+        top_left_dot
+            .translate(-position + *border_size)
+            .draw_styled(style, target)?;
+    }
+
+    // Draw vertical sides (including top left and bottom right corner dots)
+    let vertical_line = Line::new(Point::zero(), Point::new(0, border_size.height as i32));
+    let dotted_line = DottedLinePoints::with_dot_size(&vertical_line, dot_size as i32);
+
+    for position in dotted_line.skip(1) {
+        top_left_dot
+            .translate(position + border_size.x_axis())
+            .draw_styled(style, target)?;
+        top_left_dot
+            .translate(-position + border_size.y_axis())
+            .draw_styled(style, target)?;
+    }
+
+    Ok(())
+}
+
+/// Draw a dotted (maybe degenerate) rectangle border using 0, 2 or 4 dotted lines.
+/// Corners can be dots or gaps (the result doesn't have central symmetry).
+fn draw_dotted_rectangle_border_in_clockwise_order2<D>(
+    top_left: &Point,
+    border_size: &Size,
+    dot_size: u32,
+    style: &PrimitiveStyle<D::Color>,
+    target: &mut D,
+) -> Result<(), D::Error>
+where
+    D: DrawTarget,
+{
+    let top_left_dot = Rectangle::new(*top_left, Size::new_equal(dot_size));
+    let mut unit_is_dot = false;
+
+    let nb_sides_to_draw = match (
+        border_size.x_axis() == Size::zero(),
+        border_size.y_axis() == Size::zero(),
+    ) {
+        (false, false) => 4,
+        (true, true) => 0,
+        // In case one pair of opposite borders overlap,
+        // only draw the first 2 sides in clockwise order to avoid overwriting in the buffer.
+        (_, _) => 2,
+    };
+
+    let horizontal_line = Line::new(Point::zero(), Point::new(border_size.width as i32, 0));
+    let horizontal_dotted_line =
+        DottedLinePoints::with_dot_size_include_gaps(&horizontal_line, dot_size as i32);
+
+    let vertical_line = Line::new(Point::zero(), Point::new(0, border_size.height as i32));
+    let vertical_dotted_line =
+        DottedLinePoints::with_dot_size_include_gaps(&vertical_line, dot_size as i32);
+
+    if nb_sides_to_draw != 4 {
+        top_left_dot.draw_styled(style, target)?;
+    }
+
+    if nb_sides_to_draw > 0 {
+        for position in horizontal_dotted_line.skip(1) {
+            if unit_is_dot {
+                top_left_dot
+                    .translate(position)
+                    .draw_styled(style, target)?;
+            }
+            unit_is_dot = !unit_is_dot;
+        }
+
+        for position in vertical_dotted_line.skip(1) {
+            if unit_is_dot {
+                top_left_dot
+                    .translate(position + border_size.x_axis())
+                    .draw_styled(style, target)?;
+            }
+            unit_is_dot = !unit_is_dot;
+        }
+    }
+
+    if nb_sides_to_draw > 2 {
+        for position in horizontal_dotted_line.skip(1) {
+            if unit_is_dot {
+                top_left_dot
+                    .translate(-position + *border_size)
+                    .draw_styled(style, target)?;
+            }
+            unit_is_dot = !unit_is_dot;
+        }
+
+        for position in vertical_dotted_line.skip(1) {
+            if unit_is_dot {
+                top_left_dot
+                    .translate(-position + border_size.y_axis())
+                    .draw_styled(style, target)?;
+            }
+            unit_is_dot = !unit_is_dot;
+        }
+    }
+
+    Ok(())
+}
 /// Draw a dotted rectangular border.
 ///
 /// The dot type is [`Rectangle`] (this method is meant to be used with smaller values of `dot_size`).
@@ -262,7 +385,7 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
             let dot_style = PrimitiveStyle::with_fill(stroke_color);
 
             if dot_size < 4 {
-                draw_dotted_rectangle_border_in_clockwise_order(
+                draw_dotted_rectangle_border_in_clockwise_order2(
                     &stroke_area.top_left,
                     &border_size,
                     dot_size,
@@ -270,7 +393,7 @@ impl<C: PixelColor> StyledDrawable<PrimitiveStyle<C>> for Rectangle {
                     target,
                 )?
             } else {
-                draw_dotted_rectangle_border_with_dotted_corners(
+                draw_dotted_rectangle_border_with_dotted_corners2(
                     &stroke_area.top_left,
                     &border_size,
                     dot_size,
